@@ -1,0 +1,20 @@
+{
+  "configurations": [
+  {  
+    "name": "Run GDB",
+    "type": "cppdbg",
+    "request": "launch",
+    "program": "${workspaceRoot}/a.out",
+    "args": [],
+    "stopAtEntry": false,
+    "cwd": "${workspaceRoot}",
+    "externalConsole": false,
+    "MIMode": "gdb",
+    "preLaunchTask": "build"
+  }
+  ]
+}
+
+
+
+
