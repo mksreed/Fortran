@@ -1,15 +1,16 @@
 program wave_equation
     implicit none
-    integer, parameter :: nx = 80, ny = 80, nt = 200000
+    integer, parameter :: nx = 40, ny = 40, nt = 200000
     real(8), parameter :: xmin = 0.0d0, xmax = 3.141592653589793d0
     real(8), parameter :: ymin = 0.0d0, ymax = 3.141592653589793d0
     real(8) :: dx, dy
-    real(8), dimension(nx, ny) :: p, pd, b
+    real(8), dimension(nx, ny) :: p1, pd1, b1
+    real(8), dimension(0:nx+1,0:ny+1) :: p, pd, b
     real(8), dimension(nx) :: x
     real(8), dimension(ny) :: y
-    real(8), dimension(nx, ny) :: Xs, Ys
+    real(8), dimension(0:nx+1, 0:ny+1) :: Xs, Ys
     integer :: it, cx, cy,i,j
-    real(8), dimension(nx,ny) :: pexact, err, totalerr
+    real(8), dimension(0:nx+1,0:ny+1) :: pexact, err, totalerr
     real(8) :: meanerr, maxerr, maxp, maxpexact
 
     ! Initialization
@@ -21,11 +22,12 @@ program wave_equation
     b = 0.0d0
     x = [(xmin + i * dx, i = 0, nx-1)]
     y = [(ymin + j * dy, j = 0, ny-1)]
-    do 10 j=1,ny,1
-        do 10 i=1,nx,1
+    do  j=1,ny,1
+        do i=1,nx,1
             Xs(i,j)=x(i);
             Ys(i,j)=y(j);
-010 continue
+        end do
+    end do
 
 
     ! Source
@@ -37,7 +39,10 @@ program wave_equation
     pexact = (Xs - Xs * Xs) * (Ys - Ys * Ys)
     pexact = sin(cx * Xs) * sin(cy * Ys)
     b = -1.0d0 * (cx * cx * pexact + cy * cy * pexact)
-
+!f_xx = (-1*f[i-2]+16*f[i-1]-30*f[i+0]+16*f[i+1]-1*f[i+2])/(12*1
+    
+    
+    h.0*h**2)
     do it = 1, nt
         pd = p
 

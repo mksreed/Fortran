@@ -1,0 +1,51 @@
+temp.txt
+implicit none
+    integer i,j
+    integer, parameter :: nx = 4, ny = 2, nz=3, neq=20
+    real(8) x(nx), y(ny),z(nz)
+    integer (4), dimension(nx, ny, nz) :: p, pd, bbb
+    real(8), parameter :: xmin = 0.0d0, xmax = 3.141592653589793d0
+    real(8), parameter :: ymin = 0.0d0, ymax = 3.141592653589793d0 
+    real(8) :: dx=(xmax-xmin)/(neq-1), dy=(ymax-ymin)/(neq-1)
+    real(8) , dimension(neq):: a1,a2,a3,x1,b1
+    integer :: aa(2,3)
+    integer :: bb(3,2)
+    integer ::  cc(3,3), dd(3), ee(2,2), ff(3), gg(2), v1(4),v2(4)
+    aa = reshape([1, 2, 3, 4, 5, 6], [2, 3])
+    bb = reshape([10, 20, 30, 40, 50, 60], [3, 2])
+    cc = reshape([1,2,3,4,5,6,7,8,9],[3,3])
+    x=[((i-1)*dx,i=1,neq)]
+    y=[((j-1)*dy,j=1,neq)]
+    bbb=1
+    p=bb*2
+    pd=bbb*p+bbb
+!    pd=[(x[i],i=1,nx),(j=1,ny*nz)]
+    print *,sum(bbb),sum(p),sum(p-bbb)
+    print *,shape(p)
+    print *,"dx=",dx,",dy=",dy
+    print *,x
+    print *,pd
+    print *,matmul(aa,bb)
+    print *,cc
+    print *,matmul(cc,bb)
+    print *, dot_product(x,x)
+!-------------------------------------Tridiag section
+    a1=1.0/dx
+    a2=-2/dx**2
+    a3=1.0/dx
+    b1=sin(x)
+    call solve_tridiag(a1,a2,a3,b1,x1)
+end program array1
+! 0.15842337429320230        8.2421618074276723E-018   1.1516040259945637       0.99318065170136138  
+! 2.2191915935651840E-002   1.1195687301511917E-016   1.0211646123108200       0.99897269637516817
+! 8.4737102333518610E-003  -9.1081127629960704E-017   1.0080784088470027       0.99960469861365087 
+! 2.0845128966888726E-003  -1.3284654702046363E-017   1.0019869170409343       0.99990240414424547 
+> y<-c(0.15842,.02219,.00847,0.00208)
+> x<-pi/c(19,39,79,159)
+> plot(log10(x),log10(y))
+> lm(log10(y)~log10(x))
+Call:
+lm(formula = log10(y) ~ log10(x))
+Coefficients:
+(Intercept)     log10(x)  
+      0.655        1.973 
