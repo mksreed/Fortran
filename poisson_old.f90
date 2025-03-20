@@ -2,12 +2,13 @@ program poisson_main
     integer nx,ny,i;
     nx=10
     ny=10
-    do i=1,5
-        call poisson(nx,ny)
+    do i=1,3
+        call poisson_4(nx,ny)
         nx=nx*2
         ny=ny*2
     end do
 end program poisson_main
+!****************************************************************************
 Subroutine poisson(nx, ny)
     implicit none
     integer, intent(in) :: nx
@@ -63,3 +64,68 @@ Subroutine poisson(nx, ny)
     end do
     print *, maxerr, meanerr, maxp, maxpexact
 end SUBROUTINE poisson
+!****************************************************************************
+Subroutine poisson_4(nx, ny)
+    implicit none
+    integer, intent(in) :: nx
+    integer, intent(in) :: ny
+    integer, parameter :: nt = 200000
+    real(8), parameter :: xmin = 0.0d0, xmax = 3.141592653589793d0
+    real(8), parameter :: ymin = 0.0d0, ymax = 3.141592653589793d0
+    real(8) :: dx, dy
+    real(8), dimension(0:nx+1, 0:ny+1) :: p, pd, b
+    real(8), dimension(0:nx+1) :: x
+    real(8), dimension(0:ny+1) :: y
+    real(8), dimension(0:nx+1, 0:ny+1) :: Xs, Ys
+    integer :: it, cx, cy,i,j
+    real(8), dimension(0:nx+1,0:ny+1) :: pexact, err, totalerr
+    real(8) :: meanerr, maxerr, maxp, maxpexact
+    ! Initialization
+    dx = (xmax - xmin) / real(nx - 1, 8)
+    dy = (ymax - ymin) / real(ny - 1, 8)
+    p = 0.0d0
+    pd = 0.0d0
+    b = 0.0d0
+    x = [(xmin + (i-1) * dx, i = 0, nx+1)]
+    y = [(ymin + (j-1) * dy, j = 0, ny+1)]
+    do j=0,ny+1,1
+        do i=0,nx+1,1
+            Xs(i,j)=x(i);
+            Ys(i,j)=y(j);
+        end do    
+    end do
+    cx = 8
+    cy = 8
+    b(ny / 4 + 1, nx / 4 + 1) = 100.0d0
+    b(3 * ny / 4 + 1, 3 * nx / 4 + 1) = -100.0d0
+    b = 2.0d0 * ((Ys * Ys - Ys) + (Xs * Xs - Xs))
+    pexact = (Xs - Xs * Xs) * (Ys - Ys * Ys)
+    pexact = sin(cx * Xs) * sin(cy * Ys)
+    b = -1.0d0 * (cx * cx * pexact + cy * cy * pexact)
+    do it = 1, nt
+        pd = p
+        do j=2,ny-1
+            do i=2,nx-1
+                p(i,j)=((-p(i+2,j)+16*p(i+1,j)+16*p(i-1,j)-p(i-2,j))*dy**2 + &
+                       (-p(i,j+2)+16*p(i,j+1)+16*p(i,j-1)-p(i,j-2))*dy**2 - & 
+                       (b(i,j)*12.*dx**2*dy**2))/ &
+                       (30.*(dx**2+dy**2))
+            end do
+        end do
+        p(1, :) = 0.0d0
+        p(nx, :) = 0.0d0
+        p(:, 1) = 0.0d0
+        p(:, ny) = 0.0d0
+        p(0, :) = -p(2,:)
+        p(nx+1, :) = -p(nx-1,:)
+        p(:, 0) = -p(:,2)
+        p(:, ny+1) = -p(:,ny-1)
+        err = p - pexact
+        totalerr = sum(err)
+        meanerr = sum(err) / real(ny * nx, 8)
+        maxerr = maxval(err)
+        maxp = maxval(p)
+        maxpexact = maxval(pexact)
+    end do
+    print *, maxerr, meanerr, maxp, maxpexact
+end SUBROUTINE poisson_4
