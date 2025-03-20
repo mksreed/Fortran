@@ -2,7 +2,8 @@ program poisson_main
     integer nx,ny,i;
     nx=10
     ny=10
-    do i=1,3
+    do i=1,4
+        call poisson(nx,ny)
         call poisson_4(nx,ny)
         nx=nx*2
         ny=ny*2
