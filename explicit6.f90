@@ -2,7 +2,7 @@ program call_thomas_algorithm
     implicit none
     integer :: i
     double precision :: pi, xmax, dx, s1, s2, s3
-    integer, parameter :: nx = 100  ! Define nx as needed
+    integer, parameter :: nx = 65  ! Define nx as needed
     double precision :: x(-1:nx+2)
     double precision :: uxf(nx),uf(nx),uxxf(nx)
     double precision :: uxxe(-1:nx+2),uxx(nx),uu(nx)
@@ -16,8 +16,8 @@ program call_thomas_algorithm
     xmax = 2.0d0 * pi
     dx = xmax / real(nx - 1)
     s1 = 5.0d0
-    s2=10.0
-    s3=1.0
+    s2=15.0
+    s3=3.0
     x=[(i*dx-dx,i=-1,nx+2,1)]
     u=sin(s1*x)+sin(s2*x)*s3
     uxe=s1*cos(s1*x)+s2*cos(s2*x)*s3
@@ -40,11 +40,17 @@ program call_thomas_algorithm
         write(*,'(I3,6F12.6)')i, x(i),u(i),ux(i),uxe(i),uxx(i),uxxe(i)
         write(unit,'(I3,6F12.6)') i, x(i),u(i),ux(i),uxe(i),uxx(i),uxxe(i)
     end do
+    call explicitFilterx(uu, uf, dx, nx, boundary_flag_L, boundary_flag_R)
     call explicitFilterx(uxx, uxxf, dx, nx, boundary_flag_L, boundary_flag_R)
-    write(unit1, '(A)') "i,x,u,uf"
+    boundary_flag_L=100
+    boundary_flag_R=100
+    call explicitFilterx(ux, uxf, dx, nx, boundary_flag_L, boundary_flag_R)
+
+
+    write(unit1, '(A)') "i,x,uu,uf,uux,uuxf,uuxx,uuxxf"
     do i = 1, nx
-        write(*,'(I3,3F12.6)') i, x(i),uxx(i),uxxf(i)
-        write(unit1,'(I3,3F12.6)') i,x(i),uxx(i),uxxf(i)
+        write(*,'(I3,7F12.6)') i, x(i),uu(i),uf(i),ux(i),uxf(i),uxx(i),uxxf(i)
+        write(unit1,'(I3,7F12.6)') i, x(i),uu(i),uf(i),ux(i),uxf(i),uxx(i),uxxf(i)
     end do
     close(unit)
     close(unit1)
