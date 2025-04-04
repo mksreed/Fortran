@@ -16,20 +16,20 @@ program call_thomas_algorithm
     xmax = 2.0d0 * pi
     dx = xmax / real(nx - 1)
     s1 = 5.0d0
-    s2=15.0
+    s2=10.0
     s3=3.0
     x=[(i*dx-dx,i=-1,nx+2,1)]
-    u=sin(s1*x)+sin(s2*x)*s3
-    uxe=s1*cos(s1*x)+s2*cos(s2*x)*s3
-    uxxe=-s1*s1*sin(s1*x)-s2*s2*sin(s2*x)*s3
+    u=cos(s1*x)+cos(s2*x)*s3
+    uxe=-s1*sin(s1*x)-s2*sin(s2*x)*s3
+    uxxe=-s1*s1*cos(s1*x)-s2*s2*cos(s2*x)*s3
     uu=u(1:nx)
     filename = "outfile.txt"
     filename1 = "outfile1.txt"
     open(unit=unit, file=filename, status='replace')
     open(unit=unit1, file=filename1, status='replace')
 
-    boundary_flag_L=96
-    boundary_flag_R=96
+    boundary_flag_L=88
+    boundary_flag_R=88
     ux=0
     call explicit6x(uu, ux, dx, nx, boundary_flag_L, boundary_flag_R)
     uxx=0
