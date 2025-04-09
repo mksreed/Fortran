@@ -36,19 +36,20 @@ program call_thomas_algorithm
     C54(1)=0.0
     pi = 3.14159265358979323d0
     !-----------------------------------------------------
-    nu=0.1
-    nmax=50
+    nu=0.001
+    nmax=8001
     time=0.0
-    dt=0.01
-    i_print_freq=1
+    dt=0.0001
+    i_print_freq=nmax/5
     imax=nx
     xmax = 2.0d0 * pi
     dx = xmax / real(nx - 1)
-    s1 = 1.0d0
+    s1 = 2.0d0
     s2=1.0
     s3=1.0
-    x=[(i*dx-dx,i=-1,nx+2,1)]
-    u=cos(s1*x)+cos(s2*x)*s3
+    !x=[(i*dx-dx,i=-1,nx+2,1)]
+    x=[((i-nx/2)*dx,i=-1,nx+2,1)]
+    u=max(cos(s1*x)+cos(s2*x)*s3,0.0)
     ue=u
 
     u0=u(1:nx)
@@ -58,15 +59,16 @@ program call_thomas_algorithm
     open(unit=unit, file=filename, status='replace')
     open(unit=unit1, file=filename1, status='replace')
 
-    boundary_flag_L=88
-    boundary_flag_R=88
+    boundary_flag_L=99
+    boundary_flag_R=99
 
     !--------------------------------------------------------
         ! Main loop
     !u0=0
     !u1=0
     uf=0
-    write(unit1, '(A)') "x,u4,ue,uf,t"
+    write(unit1, '(A)') "t,umax"
+    write(unit, '(A)') "i,x,u,ue,t"
     do n = 1, nmax + 1
         do ir = 1, nmax54
             fdudx=0
@@ -80,20 +82,24 @@ program call_thomas_algorithm
             end do
         end do
         !uf=uf+dt*time
+        uf=u0
+        call explicitFilterx(u0, uf, dx, nx, boundary_flag_L, boundary_flag_R)
         time = time + dt
+        u0=uf
         !ue=time*time/2.
-        if (mod(n, i_print_freq) == 0) then
-            do i = 10, imax,imax
-                write(unit1, '(5F14.7)') x(i), u0(i), ue(i), uf(i), real(n * dt + 0.000)
+        if (mod(n, i_print_freq) == 0 .or. n==1) then
+            write(unit1, '(2F14.7)') real(n * dt + 0.000),maxval(u0)
+            do i = 1,imax
+                write(unit,'(I3,4F12.6)') i, x(i),u0(i),ue(i),time
             end do
         end if
     end do
     u(1:imax)=u0
     !--------------------------------------------------------
-    write(unit, '(A)') "i,x,u,ue"
+
     do i = 1, nx
-        write(*,'(I3,3F12.6)')i, x(i),u(i),ue(i)
-        write(unit,'(I3,3F12.6)') i, x(i),u(i),ue(i)
+        write(*,'(I3,4F12.6)')i, x(i),u(i),ue(i),time
+        write(unit,'(I3,4F12.6)') i, x(i),u(i),ue(i),time
     end do
     !call explicitFilterx(u0, uf, dx, nx, boundary_flag_L, boundary_flag_R)
 
