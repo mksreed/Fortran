@@ -1,4 +1,4 @@
-program call_thomas_algorithm
+program Burger1d
     implicit none
     integer :: i,ir, n, nmax,nmax54,imax,i_print_freq
     double precision :: pi, xmax, dx, s1, s2, s3,nu,dt,time
@@ -36,10 +36,10 @@ program call_thomas_algorithm
     C54(1)=0.0
     pi = 3.14159265358979323d0
     !-----------------------------------------------------
-    nu=0.001
+    nu=0.000000000001
     nmax=8001
     time=0.0
-    dt=0.0001
+    dt=0.001
     i_print_freq=nmax/5
     imax=nx
     xmax = 2.0d0 * pi
@@ -50,6 +50,7 @@ program call_thomas_algorithm
     !x=[(i*dx-dx,i=-1,nx+2,1)]
     x=[((i-nx/2)*dx,i=-1,nx+2,1)]
     u=max(cos(s1*x)+cos(s2*x)*s3,0.0)
+    u=exp(-10*(x)**2)
     ue=u
 
     u0=u(1:nx)
@@ -83,7 +84,7 @@ program call_thomas_algorithm
         end do
         !uf=uf+dt*time
         uf=u0
-        call explicitFilterx(u0, uf, dx, nx, boundary_flag_L, boundary_flag_R)
+        call explicitFilter4x(u0, uf, dx, nx, boundary_flag_L, boundary_flag_R)
         time = time + dt
         u0=uf
         !ue=time*time/2.
@@ -101,7 +102,7 @@ program call_thomas_algorithm
         write(*,'(I3,4F12.6)')i, x(i),u(i),ue(i),time
         write(unit,'(I3,4F12.6)') i, x(i),u(i),ue(i),time
     end do
-    !call explicitFilterx(u0, uf, dx, nx, boundary_flag_L, boundary_flag_R)
+    call explicitFilter4x(u0, uf, dx, nx, boundary_flag_L, boundary_flag_R)
 
     !write(unit1, '(A)') "i,x,u,ue"
     do i = 1, nx
@@ -110,7 +111,7 @@ program call_thomas_algorithm
     end do
     close(unit)
     close(unit1)
-end program call_thomas_algorithm
+end program Burger1d
   !*************************************************
 subroutine compute_R(ut, time, fdudx, dx, imax, nu, boundary_flag_L, boundary_flag_R)
     implicit none
@@ -119,19 +120,20 @@ subroutine compute_R(ut, time, fdudx, dx, imax, nu, boundary_flag_L, boundary_fl
     double precision, dimension(imax) :: dudx, dudxx
     double precision :: dx, time
     integer :: i,imax
-    double precision :: nu
+    double precision :: nu,C
     integer :: boundary_flag_L, boundary_flag_R
+    C=1
 
     ! Call the explicit functions
     dudx=0
-    call explicit6x(ut, dudx, dx, imax, boundary_flag_L, boundary_flag_R)
+    call explicit4x(ut, dudx, dx, imax, boundary_flag_L, boundary_flag_R)
     dudxx=0
     call explicit6xx(ut, dudxx, dx, imax, boundary_flag_L, boundary_flag_R)
 
     ! Compute fdudx 
     do i = 1, imax
-        fdudx(i) = -ut(i) * dudx(i) + dudxx(i) * nu
-        ! fdudx(i) = C * dudx(i) + dudxx6(i) * nu  ! Uncomment if needed
+        !fdudx(i) = -ut(i) * dudx(i) + dudxx(i) * nu
+        fdudx(i) = C * dudx(i) + dudxx(i) * nu  ! Uncomment if needed
         !fdudx(i)=time
     end do
 end subroutine compute_R
@@ -217,7 +219,7 @@ end subroutine compute_R
 
 end subroutine explicit6x
 !***************************************************************
-subroutine explicitFilterx(f, fx, dx, imax, boundary_flag_L, boundary_flag_R)
+subroutine explicitFilter6x(f, fx, dx, imax, boundary_flag_L, boundary_flag_R)
     implicit none
     integer, intent(in) :: imax, boundary_flag_L, boundary_flag_R
     double precision, intent(in) :: dx
@@ -295,7 +297,7 @@ subroutine explicitFilterx(f, fx, dx, imax, boundary_flag_L, boundary_flag_R)
                      a43 * (ft(i + 3) + ft(i - 3))) * 0.5
     end do
 
-end subroutine explicitFilterx
+end subroutine explicitFilter6x
   !*************************************************
 subroutine explicit6xx(f, fx, dx, imax, boundary_flag_L, boundary_flag_R)
     implicit none
@@ -377,3 +379,296 @@ subroutine explicit6xx(f, fx, dx, imax, boundary_flag_L, boundary_flag_R)
             cp1 * ft(i + 1) + cp2 * ft(i + 2) + cp3 * ft(i + 3)) / dx/dx
     end do
 end subroutine explicit6xx
+!*************************************************
+subroutine explicit4x(f, fx, dx, imax, boundary_flag_L, boundary_flag_R)
+    implicit none
+    integer, intent(in) :: imax, boundary_flag_L, boundary_flag_R
+    double precision, intent(in) :: dx
+    double precision, dimension(imax), intent(in) :: f
+    double precision, dimension(imax), intent(out) :: fx
+    double precision :: c0,c1,c2,c3,c4,c5,c6
+    double precision :: ft(-5:imax+6), fixed_value_L, fixed_value_R
+    integer :: i
+
+    c6=-0.000957455525961
+    c5= 0.008242459236975
+    c4=-0.037162191039544
+    c3 =0.119465303396051
+    c2 =-0.320910877852970
+    c1 = 0.896607046646854
+    c0 = 0.0d0
+
+    fixed_value_L = f(1)
+    fixed_value_R = f(imax)
+
+    ft(1:imax)=f
+
+    if (boundary_flag_L == 88) then
+        ft(0) = f(2)
+        ft(-1) = f(3)
+        ft(-2) = f(4)
+        ft(-3) = f(5)
+        ft(-4) = f(6)
+        ft(-5) = f(7)       
+    end if
+
+    if (boundary_flag_R == 88) then
+        ft(imax+1)=f(imax-1)
+        ft(imax+2)=f(imax-2)
+        ft(imax+3)=f(imax-3)
+        ft(imax+4)=f(imax-4)
+        ft(imax+5)=f(imax-5)
+        ft(imax+6)=f(imax-6)
+    end if
+
+    if (boundary_flag_L == 99) then
+        ft(-5:0)=f(imax-6:imax-1)
+    end if
+
+    if (boundary_flag_R == 99) then
+        ft(imax+1:imax+6)=f(2:7)
+    end if
+
+    if (boundary_flag_L == 96) then
+        ft(1) = 0.0d0
+        ft(0) = -f(2)
+        ft(-1) = -f(3)
+        ft(-2) = -f(4)
+        ft(-3) = -f(5)
+        ft(-4) = -f(6)
+        ft(-5) = -f(7)  
+    end if
+
+    if (boundary_flag_R == 96) then
+        ft(imax) = 0.0d0
+        ft(imax+1)=-f(imax-1)
+        ft(imax+2)=-f(imax-2)
+        ft(imax+3)=-f(imax-3)
+        ft(imax+4)=-f(imax-4)
+        ft(imax+5)=-f(imax-5)
+        ft(imax+6)=-f(imax-6)
+    end if
+
+    if (boundary_flag_L == 100) then
+        ft(-5:1) = fixed_value_L
+    end if
+
+    if (boundary_flag_R == 100) then
+        ft(imax+1:imax+6)=fixed_value_R
+    end if
+
+    if (boundary_flag_L < 80) then
+        ft(-5:1) = boundary_flag_L
+    end if
+
+    if (boundary_flag_R < 80) then
+        ft(imax+0:imax+6) = boundary_flag_R
+    end if
+
+    do i = 1, imax
+        fx(i) = (c6*(ft(i+6)-ft(i-6)) + &
+                c5*(ft(i+5)-ft(i-5)) + &
+                c4*(ft(i+4)-ft(i-4)) + &
+                c3*(ft(i+3)-ft(i-3)) + &
+                c2*(ft(i+2)-ft(i-2)) + &
+                c1*(ft(i+1)-ft(i-1)) + &
+                c0*(ft(i+0)))/dx
+    end do
+
+end subroutine explicit4x
+!***************************************************************
+subroutine explicitFilter4x(f, fx, dx, imax, boundary_flag_L, boundary_flag_R)
+    implicit none
+    integer, intent(in) :: imax, boundary_flag_L, boundary_flag_R
+    double precision, intent(in) :: dx
+    double precision, dimension(imax), intent(in) :: f
+    double precision, dimension(imax), intent(out) :: fx
+    double precision :: c0,c1,c2,c3,c4,c5,c6
+    double precision :: ft(-5:imax+6), fixed_value_L, fixed_value_R
+    integer :: i
+
+    c6 = 0.001254597714
+    c5 =-0.008520738659
+    c4 = 0.029662754736
+    c3 =-0.069975429105
+    c2 = 0.123632891797
+    c1 =-0.171503832236
+    c0 = 0.190899511506
+
+    fixed_value_L = f(1)
+    fixed_value_R = f(imax)
+
+    ft(1:imax)=f
+
+    if (boundary_flag_L == 88) then
+        ft(0) = f(2)
+        ft(-1) = f(3)
+        ft(-2) = f(4)
+        ft(-3) = f(5)
+        ft(-4) = f(6)
+        ft(-5) = f(7)       
+    end if
+
+    if (boundary_flag_R == 88) then
+        ft(imax+1)=f(imax-1)
+        ft(imax+2)=f(imax-2)
+        ft(imax+3)=f(imax-3)
+        ft(imax+4)=f(imax-4)
+        ft(imax+5)=f(imax-5)
+        ft(imax+6)=f(imax-6)
+    end if
+
+    if (boundary_flag_L == 99) then
+        ft(-5:0)=f(imax-6:imax-1)
+    end if
+
+    if (boundary_flag_R == 99) then
+        ft(imax+1:imax+6)=f(2:7)
+    end if
+
+    if (boundary_flag_L == 96) then
+        ft(1) = 0.0d0
+        ft(0) = -f(2)
+        ft(-1) = -f(3)
+        ft(-2) = -f(4)
+        ft(-3) = -f(5)
+        ft(-4) = -f(6)
+        ft(-5) = -f(7)  
+    end if
+
+    if (boundary_flag_R == 96) then
+        ft(imax) = 0.0d0
+        ft(imax+1)=-f(imax-1)
+        ft(imax+2)=-f(imax-2)
+        ft(imax+3)=-f(imax-3)
+        ft(imax+4)=-f(imax-4)
+        ft(imax+5)=-f(imax-5)
+        ft(imax+6)=-f(imax-6)
+    end if
+
+    if (boundary_flag_L == 100) then
+        ft(-5:1) = fixed_value_L
+    end if
+
+    if (boundary_flag_R == 100) then
+        ft(imax+1:imax+6)=fixed_value_R
+    end if
+
+    if (boundary_flag_L < 80) then
+        ft(-5:1) = boundary_flag_L
+    end if
+
+    if (boundary_flag_R < 80) then
+        ft(imax+0:imax+6) = boundary_flag_R
+    end if
+
+    do i = 1, imax
+        fx(i) = ft(i)+ 0.1*&
+               (c6*(ft(i+6)+ft(i-6)) + &
+                c5*(ft(i+5)+ft(i-5)) + &
+                c4*(ft(i+4)+ft(i-4)) + &
+                c3*(ft(i+3)+ft(i-3)) + &
+                c2*(ft(i+2)+ft(i-2)) + &
+                c1*(ft(i+1)+ft(i-1)) + &
+                c0*(ft(i+0)))
+    end do
+
+end subroutine explicitFilter4x
+!***************************************************************
+subroutine explicitFilter10x(f, fx, dx, imax, boundary_flag_L, boundary_flag_R)
+    implicit none
+    integer, intent(in) :: imax, boundary_flag_L, boundary_flag_R
+    double precision, intent(in) :: dx
+    double precision, dimension(imax), intent(in) :: f
+    double precision, dimension(imax), intent(out) :: fx
+    double precision :: c0,c1,c2,c3,c4,c5,c6
+    double precision :: ft(-5:imax+6), fixed_value_L, fixed_value_R
+    integer :: i
+
+    c6 = 0.0
+    c5 = 1./512.
+    c4 =-5./256.
+    c3 = 45./512.
+    c2 =-15./64.
+    c1 = 105./256.
+    c0 = 193./256.
+
+    fixed_value_L = f(1)
+    fixed_value_R = f(imax)
+
+    ft(1:imax)=f
+
+    if (boundary_flag_L == 88) then
+        ft(0) = f(2)
+        ft(-1) = f(3)
+        ft(-2) = f(4)
+        ft(-3) = f(5)
+        ft(-4) = f(6)
+        ft(-5) = f(7)       
+    end if
+
+    if (boundary_flag_R == 88) then
+        ft(imax+1)=f(imax-1)
+        ft(imax+2)=f(imax-2)
+        ft(imax+3)=f(imax-3)
+        ft(imax+4)=f(imax-4)
+        ft(imax+5)=f(imax-5)
+        ft(imax+6)=f(imax-6)
+    end if
+
+    if (boundary_flag_L == 99) then
+        ft(-5:0)=f(imax-6:imax-1)
+    end if
+
+    if (boundary_flag_R == 99) then
+        ft(imax+1:imax+6)=f(2:7)
+    end if
+
+    if (boundary_flag_L == 96) then
+        ft(1) = 0.0d0
+        ft(0) = -f(2)
+        ft(-1) = -f(3)
+        ft(-2) = -f(4)
+        ft(-3) = -f(5)
+        ft(-4) = -f(6)
+        ft(-5) = -f(7)  
+    end if
+
+    if (boundary_flag_R == 96) then
+        ft(imax) = 0.0d0
+        ft(imax+1)=-f(imax-1)
+        ft(imax+2)=-f(imax-2)
+        ft(imax+3)=-f(imax-3)
+        ft(imax+4)=-f(imax-4)
+        ft(imax+5)=-f(imax-5)
+        ft(imax+6)=-f(imax-6)
+    end if
+
+    if (boundary_flag_L == 100) then
+        ft(-5:1) = fixed_value_L
+    end if
+
+    if (boundary_flag_R == 100) then
+        ft(imax+1:imax+6)=fixed_value_R
+    end if
+
+    if (boundary_flag_L < 80) then
+        ft(-5:1) = boundary_flag_L
+    end if
+
+    if (boundary_flag_R < 80) then
+        ft(imax+0:imax+6) = boundary_flag_R
+    end if
+
+    do i = 1, imax
+        fx(i) =(c6*(ft(i+6)+ft(i-6)) + &
+                c5*(ft(i+5)+ft(i-5)) + &
+                c4*(ft(i+4)+ft(i-4)) + &
+                c3*(ft(i+3)+ft(i-3)) + &
+                c2*(ft(i+2)+ft(i-2)) + &
+                c1*(ft(i+1)+ft(i-1)) + &
+                c0*(ft(i+0)+ft(i+0)))/2.
+    end do
+
+end subroutine explicitFilter10x
+!***************************************************************
