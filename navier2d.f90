@@ -3,8 +3,8 @@ program navier_stokes_2d
     integer, parameter :: nx = 50, ny = 50, nt = 500
     double precision, parameter :: dx = 1.0/nx, dy = 1.0/ny
     double precision, parameter :: dt = 0.001, Re = 100.0
-    double precision, dimension(0:nx,0:ny) :: u, v, u_new, v_new, p,  b
-    double precision :: umax=0,vmax=0
+    double precision, dimension(0:nx,0:ny) :: x, y, u, v, u_new, v_new, p,  b
+    double precision :: umax=0,vmax=0,theta=0,rad=0
     integer :: i, j, n
     double precision :: rho = 1.0, nu, time=0
     character(len=20) :: filename, filename1
@@ -14,14 +14,24 @@ program navier_stokes_2d
     open(unit=unit, file=filename, status='replace')
     open(unit=unit1, file=filename1, status='replace')
     write(unit1, '(A)') "t,umax,vmax"
-    write(unit, '(A)') "i,x,y,u,v,t"
+    write(unit, '(A)') "x,y,u,v,t"
 
     nu = 1.0 / Re
   
     ! Initialize fields
-    u = 0.0
+    u = 1.0
     v = 0.0
     p = 0.0
+    do j=0, ny
+      do i = 0,nx
+         x(i,j)=(i-nx/2)*dx
+         y(i,j)=(j-ny/2)*dy
+         theta=atan(y(i,j),x(i,j))
+         rad=sqrt(x(i,j)**2+y(i,j)**2)
+         u(i,j)=0.-rad*sin(theta)*exp(-5.*rad)*2
+         v(i,j)=rad*cos(theta)*exp(-5.*rad)*2
+      end do
+     end do
   
     do n = 1, nt
       call build_rhs(b, u, v, dx, dy, dt, rho,nx,ny)
@@ -34,12 +44,13 @@ program navier_stokes_2d
       time=time+dt
 
       write(unit1,'(3F12.6)') time, umax, vmax
+      write(unit1,'(10F12.6)') u_new(15,:)
     end do
   
     print *, 'Simulation finished.'
-    do j=1, ny
-     do i = 1,nx
-        write(unit,'(2I4,4F12.6)') i,j,u(i,j),v(i,j),time
+    do j=0, ny
+     do i = 0,nx
+        write(unit,'(5F12.6)') x(i,j),y(i,j),u(i,j),v(i,j),time
      end do
     end do
 
@@ -111,10 +122,15 @@ program navier_stokes_2d
       end do
     end do
   
-    ! Boundary Conditions (no-slip)
+    ! Boundary Conditions (no-slip) Drv Cvt
     u_new(0,:) = 0.0; u_new(nx,:) = 0.0
     u_new(:,0) = 0.0; u_new(:,ny) = 1.0
     v_new(0,:) = 0.0; v_new(nx,:) = 0.0
+    v_new(:,0) = 0.0; v_new(:,ny) = 0.0
+        ! Boundary Conditions (no-slip) BL
+    u_new(0,:) = 1.0*0.0; u_new(nx,:) = u_new(nx-1,:)*0
+    u_new(:,0) = 0.0; u_new(:,ny) = 1.0*0
+    v_new(0,:) = 0.0; v_new(nx,:) = v_new(nx-1,:)*0
     v_new(:,0) = 0.0; v_new(:,ny) = 0.0
   end subroutine update_velocity
       
