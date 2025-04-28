@@ -1,7 +1,7 @@
 program navier_stokes_fd
     implicit none
     ! Parameters
-    integer, parameter :: nx = 100, ny = 100
+    integer, parameter :: nx = 10, ny = 10
     integer, parameter :: i_max = nx+2, j_max = ny+2
     integer, parameter :: nt = 1000
     double precision :: x(-2:nx+3),y(-2:ny+3), dx, dy, xmax=1, ymax=1
@@ -54,7 +54,7 @@ subroutine initialize(x,y,dx,dy,xmax,ymax,rho, u, v, T,nx,ny)
             rho(i,j) = 1.0
             u(i,j) = 0.0
             v(i,j) = 0.0
-            T(i,j) = 300.0
+            T(i,j) = 1.0
         end do
     end do
 end subroutine initialize
@@ -66,12 +66,12 @@ subroutine apply_bc(rho, u, v, T,nx,ny)
 
     do j = 1, ny
         rho(1,j) = rho(2,j)
-        u(1,j) = -u(2,j)
+        u(1,j) = u(2,j)
         v(1,j) = v(2,j)
         T(1,j) = T(2,j)
 
         rho(nx,j) = rho(nx-1,j)
-        u(nx,j) = -u(nx-1,j)
+        u(nx,j) = u(nx-1,j)
         v(nx,j) = v(nx-1,j)
         T(nx,j) = T(nx-1,j)
     end do
@@ -79,12 +79,12 @@ subroutine apply_bc(rho, u, v, T,nx,ny)
     do i = 1, nx
         rho(i,1) = rho(i,2)
         u(i,1) = u(i,2)
-        v(i,1) = -v(i,2)
+        v(i,1) = v(i,2)
         T(i,1) = T(i,2)
 
         rho(i,ny) = rho(i,ny-1)
         u(i,ny) = u(i,ny-1)
-        v(i,ny) = -v(i,ny-1)
+        v(i,ny) = v(i,ny-1)
         T(i,ny) = T(i,ny-1)
     end do
 end subroutine apply_bc
@@ -141,10 +141,14 @@ subroutine update(rho, u, v, T, p, E, rho_new, u_new, v_new, T_new,re,pr,gamma,m
             dv_dy = (v(i,j+1) - v(i,j-1)) / (2.0*dy)
             dT_dx = (T(i+1,j) - T(i-1,j)) / (2.0*dx)
             dT_dy = (T(i,j+1) - T(i,j-1)) / (2.0*dy)
-            s11   = (du_dx+du_dx)
-            s12   = (du_dy+dv_dx)
-            s22   = (dv_dx+dv_dy)
+            sxx   = (du_dx+du_dx)
+            syy   = (dv_dy+dv_dy)
+            sxy   = (dv_dx+du_dy)
             div   = (s11+s22)/2.
+            if(abs(sxx+syy+sxy+div) > 0.0) then
+                print *,i,j, sxy,div
+                !continue
+            end if
             frinv(i,j) = (rho(i,j)*u(i,j))
             grinv(i,J) = (rho(i,j)*v(i,j))
 
@@ -167,12 +171,14 @@ subroutine update(rho, u, v, T, p, E, rho_new, u_new, v_new, T_new,re,pr,gamma,m
             
 
             ! Heat conduction
-            qx=-amucv/eckpv*dT_dx
-            qy=-amucv/eckpv*dT_dy
-            feinv(i,j)=u(i,j)*(E(i,j)+p(i,j))
-            geinv(i,j)=v(i,j)*(E(i,j)+p(i,j))
-            fevis(i,j)=qx+u(i,j)*tauxx+v(i,j)*tauxy
-            gevis(i,j)=qy+u(i,j)*tauxy+v(i,j)*tauyy
+             qx=-amucv/(gamma-1)/mach**2/re/pr*dT_dx
+             qy=-amucv/(gamma-1)/mach**2/re/pr*dT_dy
+
+            feinv(i,j)=u(i,j)*E(i,j)+p(i,j)
+            geinv(i,j)=v(i,j)*E(i,j)+p(i,j)
+            fevis(i,j)=-qx+u(i,j)*tauxx+v(i,j)*tauxy
+            gevis(i,j)=-qy+u(i,j)*tauxy+v(i,j)*tauyy
+
 
             fr(i,j)=-frinv(i,j)
             fu(i,j)=-fuinv(i,j)+fuvis(i,j)
@@ -183,20 +189,30 @@ subroutine update(rho, u, v, T, p, E, rho_new, u_new, v_new, T_new,re,pr,gamma,m
             gu(i,j)=-guinv(i,j)+guvis(i,j)
             gv(i,j)=-gvinv(i,j)+gvvis(i,j)
             ge(i,j)=-geinv(i,j)+gevis(i,j)
+            !write(*,'(2I4,5F16.10)'),i,j, sxy,div,tauxx,tauxy,tauyy !madhu
+            !write(*,'(2I4,4F16.10)'),i,j, fuinv(i,j),fuvis(i,j),guinv(i,j),guvis(i,j)!madhu
+            !write(*,'(2I4,4F16.10)'),i,j, fvinv(i,j),fvvis(i,j),gvinv(i,j),gvvis(i,j)!madhu
+            !write(*,'(2I4,4F16.10)'),i,j, feinv(i,j),fevis(i,j),geinv(i,j),gevis(i,j)!madhu
+            !write(*,'(2I4,4F16.10)'),i,j, fr(i,j),fu(i,j),fv(i,j),fe(i,j)!madhu
+            !write(*,'(2I4,4F16.10)'),i,j, gr(i,j),gu(i,j),gv(i,j),ge(i,j)!madhu
+            call apply_bc(fr,fu,fv,fe,nx,ny)
+            call apply_bc(gr,gu,gv,ge,nx,ny)
         end do
     end do
     do j = 2, ny-1
         do i = 2, nx-1
             ! Update equations
-            rho_new(i,j) = rho(i,j)+dt*((fr(i+1,j)-fr(i-1,j))/2./dx+(fr(i,j+1)-fr(i,j-1))/2./dy)
-            ru_new = ru + dt * ((fu(i+1,j)-fu(i-1,j))/2./dx+(fu(i,j+1)-fu(i,j-1))/2./dy)
-            rv_new = rv + dt * ((fv(i,j+1)-fu(i,j-1))/2./dx+(fu(i+1,j)-fu(i-1,j))/2./dy)
-            e_new= E(i,j) + dt * ((fe(i,j+1)-fe(i,j-1))/2./dx+(fe(i+1,j)-fe(i-1,j))/2./dy)
+            rho_new(i,j) = rho(i,j)+dt*((fr(i+1,j)-fr(i-1,j))/2./dx+(gr(i,j+1)-gr(i,j-1))/2./dy)
+            ru_new       =       ru+dt*((fu(i+1,j)-fu(i-1,j))/2./dx+(gu(i,j+1)-gu(i,j-1))/2./dy)
+            rv_new       =       rv+dt*((fv(i+1,j)-fv(i-1,j))/2./dx+(gv(i,j+1)-gv(i,j-1))/2./dy)
+            e_new        =   E(i,j)+dt*((fe(i+1,j)-fe(i-1,j))/2./dx+(ge(i,j+1)-ge(i,j-1))/2./dy)
             !p(i,j) = rho(i,j) * T(i,j)/gamma/mach**2
             u_new(i,j) = ru_new/rho_new(i,j)
             v_new(i,j) = rv_new/rho_new(i,j)
             p_new=(e_new-0.5*(u_new(i,j)**2+v_new(i,j)**2))*(gamma-1)
             T_new(i,j)=p_new/rho_new(i,j)*gamma*mach**2
+            !write(*,'(2I4,6F16.10)'),i,j,rho(i,j),u(i,j),v(i,j),E(i,j),T(i,j),p(i,j)
+            !write(*,'(2I4,6F16.10)'),i,j,rho_new(i,j),u_new(i,j),v_new(i,j),e_new,T_new(i,j),p_new
         end do
     end do
 end subroutine update
