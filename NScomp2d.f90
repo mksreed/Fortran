@@ -3,13 +3,14 @@ program navier_stokes_fd
     ! Parameters
     integer, parameter :: nx = 40, ny = 40
     integer, parameter :: imax = nx+3, jmax = ny+3
-    integer, parameter :: nt = 0
+    integer, parameter :: nt = 10000
     double precision :: x(-2:nx+3),y(-2:ny+3), dx, dy, xmax=6, ymax=6
     double precision, parameter :: dt = 1e-5
     double precision, parameter :: gamma = 1.4, mach=0.2, s1=110.4/273., re=1000, pr=0.72
     double precision, parameter :: R = 287.0
     double precision, parameter :: mu = 1.8e-5
     double precision, parameter :: kappa = 0.025
+    integer i,j
 
 
     ! State variables
@@ -24,6 +25,7 @@ program navier_stokes_fd
     ! Initialization
     call initialize(x,y,dx,dy,xmax,ymax,rho, u, v, T,nx,ny,imax,jmax)
     call compute_pressure_energy(rho, u, v, T, p, E, re, pr, gamma,mach,s1,nx,ny,imax,jmax)
+    !do j=1,ny,1; do i=1,nx,1;write(*,'(2I4,3F20.13)'),i,j,u(i,j),v(i,j),p(i,j);end do;end do
 
     ! Time-stepping
     time=0
@@ -65,11 +67,12 @@ subroutine initialize(x,y,dx,dy,xmax,ymax,rho, u, v, T,nx,ny,imax,jmax)
             T(i,j) = 1.0
             theta=atan(y(j),x(i))
             rad=sqrt((x(i))**2+(y(j))**2)
-            u(i,j)=0.-rad*sin(theta)*exp(-1.*rad)*2
-            v(i,j)=rad*cos(theta)*exp(-1.*rad)*2
-            write(*,'(2I4,4F20.13)'),i,j,u(i,j),v(i,j),rad,theta
+            u(i,j)=0.-rad*sin(theta)*exp(-3.*rad)*2
+            v(i,j)=rad*cos(theta)*exp(-3.*rad)*2
+            !write(*,'(2I4,4F20.13)'),i,j,u(i,j),v(i,j),rad,theta
         end do
     end do
+    
 end subroutine initialize
 !--------------------------------------
 subroutine apply_bc(rho, u, v, T,nx,ny,imax,jmax)
@@ -116,6 +119,7 @@ subroutine compute_pressure_energy(rho, u, v, T, p, E,re,pr,gamma,mach,s1,nx,ny,
         do i = 1, nx
             p(i,j) = rho(i,j) * T(i,j)/gamma/mach**2
             E(i,j) = p(i,j)/(gamma - 1.0) + 0.5 * rho(i,j) * (u(i,j)**2 + v(i,j)**2)
+            p(i,j) = (E(i,j)-0.5 * rho(i,j) * (u(i,j)**2 + v(i,j)**2))*(gamma-1)
         end do
     end do
 end subroutine compute_pressure_energy
@@ -151,6 +155,7 @@ subroutine update(rho, u, v, T, p, E, rho_new, u_new, v_new, T_new,re,pr,gamma,m
     double precision :: div,sxx,syy,sxy
 
     double precision dx,dy,dt
+    open(12,file="outfiletemp.txt")
 
     eckpv=(gamma-1.)*mach*mach*pr
     do j = 2, ny-1
@@ -171,10 +176,10 @@ subroutine update(rho, u, v, T, p, E, rho_new, u_new, v_new, T_new,re,pr,gamma,m
             syy   = (dv_dy+dv_dy)
             sxy   = (dv_dx+du_dy)
             div   = (sxx+syy)/2.
-            if(abs(sxx+syy+sxy+div) > 0.0) then
+            !if(abs(sxx+syy+sxy+div) > 0.0) then
                 !print *,i,j, sxy,div
                 !continue
-            end if
+            !end if
             frinv(i,j) = (rho(i,j)*u(i,j))
             grinv(i,J) = (rho(i,j)*v(i,j))
 
@@ -200,8 +205,8 @@ subroutine update(rho, u, v, T, p, E, rho_new, u_new, v_new, T_new,re,pr,gamma,m
              qx=-amucv/(gamma-1)/mach**2/re/pr*dT_dx
              qy=-amucv/(gamma-1)/mach**2/re/pr*dT_dy
 
-            feinv(i,j)=u(i,j)*E(i,j)+p(i,j)
-            geinv(i,j)=v(i,j)*E(i,j)+p(i,j)
+            feinv(i,j)=u(i,j)*(E(i,j)+p(i,j))
+            geinv(i,j)=v(i,j)*(E(i,j)+p(i,j))
             fevis(i,j)=-qx+u(i,j)*tauxx+v(i,j)*tauxy
             gevis(i,j)=-qy+u(i,j)*tauxy+v(i,j)*tauyy
 
@@ -216,7 +221,7 @@ subroutine update(rho, u, v, T, p, E, rho_new, u_new, v_new, T_new,re,pr,gamma,m
             gv(i,j)=-gvinv(i,j)+gvvis(i,j)
             ge(i,j)=-geinv(i,j)+gevis(i,j)
             !write(*,'(2I4,5F16.10)'),i,j, sxy,div,tauxx,tauxy,tauyy !madhu
-            !write(*,'(2I4,4F16.10)'),i,j, fuinv(i,j),fuvis(i,j),guinv(i,j),guvis(i,j)!madhu
+            !write(12,'(2I4,4F16.10)'),i,j, fuinv(i,j),fuvis(i,j),guinv(i,j),guvis(i,j)!madhu
             !write(*,'(2I4,4F16.10)'),i,j, fvinv(i,j),fvvis(i,j),gvinv(i,j),gvvis(i,j)!madhu
             !write(*,'(2I4,4F16.10)'),i,j, feinv(i,j),fevis(i,j),geinv(i,j),gevis(i,j)!madhu
             !write(*,'(2I4,4F16.10)'),i,j, fr(i,j),fu(i,j),fv(i,j),fe(i,j)!madhu
@@ -229,18 +234,20 @@ subroutine update(rho, u, v, T, p, E, rho_new, u_new, v_new, T_new,re,pr,gamma,m
         do i = 2, nx-1
             ! Update equations
             rho_new(i,j) = rho(i,j)+dt*((fr(i+1,j)-fr(i-1,j))/2./dx+(gr(i,j+1)-gr(i,j-1))/2./dy)
-            ru_new       =       ru+dt*((fu(i+1,j)-fu(i-1,j))/2./dx+(gu(i,j+1)-gu(i,j-1))/2./dy)
-            rv_new       =       rv+dt*((fv(i+1,j)-fv(i-1,j))/2./dx+(gv(i,j+1)-gv(i,j-1))/2./dy)
+            ru_new=rho(i,j)*u(i,j) +dt*((fu(i+1,j)-fu(i-1,j))/2./dx+(gu(i,j+1)-gu(i,j-1))/2./dy)
+            rv_new=rho(i,j)*v(i,j) +dt*((fv(i+1,j)-fv(i-1,j))/2./dx+(gv(i,j+1)-gv(i,j-1))/2./dy)
             e_new        =   E(i,j)+dt*((fe(i+1,j)-fe(i-1,j))/2./dx+(ge(i,j+1)-ge(i,j-1))/2./dy)
             !p(i,j) = rho(i,j) * T(i,j)/gamma/mach**2
             u_new(i,j) = ru_new/rho_new(i,j)
             v_new(i,j) = rv_new/rho_new(i,j)
             p_new=(e_new-0.5*(u_new(i,j)**2+v_new(i,j)**2))*(gamma-1)
             T_new(i,j)=p_new/rho_new(i,j)*gamma*mach**2
+            !write(12,'(2I4,6F16.10)'),i,j,u(i,j),v(i,j),u_new(i,j),v_new(i,j),ru,ru_new
             !write(*,'(2I4,6F16.10)'),i,j,rho(i,j),u(i,j),v(i,j),E(i,j),T(i,j),p(i,j)
             !write(*,'(2I4,6F16.10)'),i,j,rho_new(i,j),u_new(i,j),v_new(i,j),e_new,T_new(i,j),p_new
         end do
     end do
+    write(*,'(3F12.6)'),maxval(u_new),maxval(v_new),maxval(p)
 end subroutine update
 !-------------------------------------
 subroutine write_output(x,y,rho, u, v, T, p,nx,ny,imax,jmax,time)
@@ -250,8 +257,11 @@ subroutine write_output(x,y,rho, u, v, T, p,nx,ny,imax,jmax,time)
     double precision :: x(-2:nx+3),y(-2:ny+3)
     double precision :: time
     integer :: i, j, nx, ny, imax, jmax
-    open(10, file="solution.dat")
+    open(10, file="outfileuv.txt")
+    open(11,file="outfile.txt")
     write(10, '(A)') "x,y,u,v,t"
+    open(11, file="outfile.txt")
+    write(11, '(A)') "x,y,r,u,v,p"
     do j=1, ny
         do i = 1,nx
            write(10,'(5F12.6)') x(i),y(j),u(i,j),v(i,j),time
@@ -259,7 +269,7 @@ subroutine write_output(x,y,rho, u, v, T, p,nx,ny,imax,jmax,time)
        end do
     do j = 1, ny
         do i = 1, nx
-            !write(10,*) i, j, rho(i,j), u(i,j), v(i,j), T(i,j), p(i,j)
+            write(11,'(6F12.6)') x(i), y(j), rho(i,j), u(i,j), v(i,j),  p(i,j)
         end do
     end do
     close(10)
