@@ -1,53 +1,61 @@
 program navier_stokes_fd
     implicit none
     ! Parameters
-    integer, parameter :: nx = 10, ny = 10
-    integer, parameter :: i_max = nx+2, j_max = ny+2
-    integer, parameter :: nt = 1000
-    double precision :: x(-2:nx+3),y(-2:ny+3), dx, dy, xmax=1, ymax=1
+    integer, parameter :: nx = 40, ny = 40
+    integer, parameter :: imax = nx+3, jmax = ny+3
+    integer, parameter :: nt = 0
+    double precision :: x(-2:nx+3),y(-2:ny+3), dx, dy, xmax=6, ymax=6
     double precision, parameter :: dt = 1e-5
-    double precision, parameter :: gamma = 1.4, mach=0.2, s1=110.4/273., re=100, pr=0.72
+    double precision, parameter :: gamma = 1.4, mach=0.2, s1=110.4/273., re=1000, pr=0.72
     double precision, parameter :: R = 287.0
     double precision, parameter :: mu = 1.8e-5
     double precision, parameter :: kappa = 0.025
 
 
     ! State variables
-    double precision :: rho(i_max,j_max), u(i_max,j_max), v(i_max,j_max), T(i_max,j_max)
-    double precision :: p(i_max,j_max), E(i_max,j_max)
-    double precision :: rho_new(i_max,j_max), u_new(i_max,j_max), v_new(i_max,j_max), T_new(i_max,j_max)
+    double precision :: rho(-2:imax,-2:jmax), u(-2:imax,-2:jmax), v(-2:imax,-2:jmax), T(-2:imax,-2:jmax)
+    double precision :: p(-2:imax,-2:jmax), E(-2:imax,-2:jmax)
+    double precision :: rho_new(-2:imax,-2:jmax), u_new(-2:imax,-2:jmax), v_new(-2:imax,-2:jmax)
+    double precision ::  T_new(-2:imax,-2:jmax)
+    double precision :: time
 
     integer :: n
 
     ! Initialization
-    call initialize(x,y,dx,dy,xmax,ymax,rho, u, v, T,nx,ny)
-    call compute_pressure_energy(rho, u, v, T, p, E, re, pr, gamma,mach,s1,nx,ny)
+    call initialize(x,y,dx,dy,xmax,ymax,rho, u, v, T,nx,ny,imax,jmax)
+    call compute_pressure_energy(rho, u, v, T, p, E, re, pr, gamma,mach,s1,nx,ny,imax,jmax)
 
     ! Time-stepping
+    time=0
     do n = 1, nt
-        call update(rho, u, v, T, p, E,rho_new,u_new,v_new,T_new,re,pr,gamma,mach,s1,dt,dx,dy,nx,ny)
-        call apply_bc(rho_new, u_new, v_new, T_new,nx,ny)
-        call compute_pressure_energy(rho_new,u_new,v_new,T_new,p,E,re,pr,gamma,mach,s1,nx,ny)
+        call update(rho, u, v, T, p, E,rho_new,u_new,v_new,T_new,re,pr,gamma,mach, &
+                                                                s1,dt,dx,dy,nx,ny,imax,jmax)
+        call apply_bc(rho_new, u_new, v_new, T_new,nx,ny,imax,jmax)
+        call compute_pressure_energy(rho_new,u_new,v_new,T_new,p,E,re,pr,gamma,mach, &
+                                                                s1,nx,ny,imax,jmax)
 
         rho = rho_new
         u = u_new
         v = v_new
         T = T_new
+        time=time+dt
     end do
 
-    call write_output(rho, u, v, T, p,nx,ny)
+    call write_output(x,y,rho, u, v, T, p,nx,ny,imax,jmax,time)
 end program navier_stokes_fd
 !---------------------
-subroutine initialize(x,y,dx,dy,xmax,ymax,rho, u, v, T,nx,ny)
+subroutine initialize(x,y,dx,dy,xmax,ymax,rho, u, v, T,nx,ny,imax,jmax)
     implicit none
-    double precision, intent(out) :: rho(nx,ny), u(nx,ny), v(nx,ny), T(nx,ny)
+    double precision, intent(out) :: rho(-2:imax,-2:jmax), u(-2:imax,-2:jmax), v(-2:imax,-2:jmax), &
+                                                 T(-2:imax,-2:jmax)
     double precision :: x(-2:nx+3),y(-2:ny+3), dx, dy, xmax, ymax
-    integer :: i, j, nx, ny
+    double precision :: rad, theta
+    integer :: i, j, nx, ny, imax, jmax
 
     dx=xmax/(nx-1)
     dy=ymax/(ny-1)
-    do i=-2,nx+2,1;x(i)=(i-1)*dx;end do
-    do j=-2,ny+2,1;y(j)=(j-1)*dy; end do
+    do i=-2,nx+2,1;x(i)=(i-imax/2)*dx;end do
+    do j=-2,ny+2,1;y(j)=(j-jmax/2)*dy; end do
 
     do j = 1, ny
         do i = 1, nx
@@ -55,46 +63,54 @@ subroutine initialize(x,y,dx,dy,xmax,ymax,rho, u, v, T,nx,ny)
             u(i,j) = 0.0
             v(i,j) = 0.0
             T(i,j) = 1.0
+            theta=atan(y(j),x(i))
+            rad=sqrt((x(i))**2+(y(j))**2)
+            u(i,j)=0.-rad*sin(theta)*exp(-1.*rad)*2
+            v(i,j)=rad*cos(theta)*exp(-1.*rad)*2
+            write(*,'(2I4,4F20.13)'),i,j,u(i,j),v(i,j),rad,theta
         end do
     end do
 end subroutine initialize
 !--------------------------------------
-subroutine apply_bc(rho, u, v, T,nx,ny)
+subroutine apply_bc(rho, u, v, T,nx,ny,imax,jmax)
     implicit none
-    double precision, intent(inout) :: rho(nx,ny), u(nx,ny), v(nx,ny), T(nx,ny)
-    integer :: i, j, nx, ny
+    double precision, intent(inout) :: rho(-2:imax,-2:jmax), u(-2:imax,-2:jmax), &
+                                        v(-2:imax,-2:jmax), T(-2:imax,-2:jmax)
+    integer :: i, j, nx, ny, imax, jmax
+    integer :: bp=0,b0=1,bs=0,bn=0,ba=0;
 
     do j = 1, ny
-        rho(1,j) = rho(2,j)
-        u(1,j) = u(2,j)
-        v(1,j) = v(2,j)
-        T(1,j) = T(2,j)
+        rho(1,j) = rho(2,j)*b0+rho(nx,j)*bp
+        u(1,j)   =   u(2,j)*b0+  u(nx,j)*bp
+        v(1,j)   =   v(2,j)*b0+  v(nx,j)*bp
+        T(1,j)   =   T(2,j)*b0+  T(nx,j)*bp
 
-        rho(nx,j) = rho(nx-1,j)
-        u(nx,j) = u(nx-1,j)
-        v(nx,j) = v(nx-1,j)
-        T(nx,j) = T(nx-1,j)
+        rho(nx,j) = rho(nx-1,j)*b0+rho(1,j)*bp
+        u(nx,j)   =   u(nx-1,j)*b0+  u(1,j)*bp
+        v(nx,j)   =   v(nx-1,j)*b0+  v(1,j)*bp
+        T(nx,j)   =   T(nx-1,j)*b0+  T(1,j)*bp
     end do
 
     do i = 1, nx
-        rho(i,1) = rho(i,2)
-        u(i,1) = u(i,2)
-        v(i,1) = v(i,2)
-        T(i,1) = T(i,2)
+        rho(i,1) = rho(i,2)*b0+rho(i,ny)*bp
+        u(i,1)   =   u(i,2)*b0+  u(i,ny)*bp
+        v(i,1)   =   v(i,2)*b0+  v(i,ny)*bp
+        T(i,1)   =   T(i,2)*b0+  T(i,ny)*bp
 
-        rho(i,ny) = rho(i,ny-1)
-        u(i,ny) = u(i,ny-1)
-        v(i,ny) = v(i,ny-1)
-        T(i,ny) = T(i,ny-1)
+        rho(i,ny) = rho(i,ny-1)*b0+rho(i,1)*bp
+        u(i,ny) =     u(i,ny-1)*b0+  u(i,1)*bp
+        v(i,ny) =     v(i,ny-1)*b0+  v(i,1)*bp
+        T(i,ny) =     T(i,ny-1)*b0+  T(i,1)*bp
     end do
 end subroutine apply_bc
 !----------------------------
-subroutine compute_pressure_energy(rho, u, v, T, p, E,re,pr,gamma,mach,s1,nx,ny)
+subroutine compute_pressure_energy(rho, u, v, T, p, E,re,pr,gamma,mach,s1,nx,ny,imax,jmax)
     implicit none
-    double precision, intent(in) :: rho(nx,ny), u(nx,ny), v(nx,ny), T(nx,ny)
-    double precision, intent(out) :: p(nx,ny), E(nx,ny)
+    double precision, intent(in) :: rho(-2:imax,-2:jmax), u(-2:imax,-2:jmax), &
+                                        v(-2:imax,-2:jmax), T(-2:imax,-2:jmax)
+    double precision, intent(out) :: p(-2:imax,-2:jmax), E(-2:imax,-2:jmax)
     double precision gamma, mach, s1, re, pr
-    integer :: i, j, nx, ny
+    integer :: i, j, nx, ny, imax, jmax
 
     do j = 1, ny
         do i = 1, nx
@@ -104,25 +120,35 @@ subroutine compute_pressure_energy(rho, u, v, T, p, E,re,pr,gamma,mach,s1,nx,ny)
     end do
 end subroutine compute_pressure_energy
 !---------------------------
-subroutine update(rho, u, v, T, p, E, rho_new, u_new, v_new, T_new,re,pr,gamma,mach,s1,dt,dx,dy,nx,ny)
+subroutine update(rho, u, v, T, p, E, rho_new, u_new, v_new, T_new,re,pr,gamma,mach,&
+                                            s1,dt,dx,dy,nx,ny,imax,jmax)
     implicit none
-    double precision, intent(in) :: rho(nx,ny), u(nx,ny), v(nx,ny), T(nx,ny), p(nx,ny), E(nx,ny)
-    double precision, intent(out) :: rho_new(nx,ny), u_new(nx,ny), v_new(nx,ny), T_new(nx,ny)
+    double precision, intent(in) :: rho(-2:imax,-2:jmax), u(-2:imax,-2:jmax), &
+                                                v(-2:imax,-2:jmax), T(-2:imax,-2:jmax)
+    double precision, intent(in) ::  p(-2:imax,-2:jmax), E(-2:imax,-2:jmax)
+    double precision, intent(out) :: rho_new(-2:imax,-2:jmax), u_new(-2:imax,-2:jmax), &
+                                        v_new(-2:imax,-2:jmax), T_new(-2:imax,-2:jmax)
     double precision :: gamma, mach, s1, re, pr
-    integer :: i, j, nx, ny
+    integer :: i, j, nx, ny, imax, jmax
     double precision :: du_dx, du_dy, dv_dx, dv_dy, dT_dx, dT_dy
     double precision :: ru,rv,ruu,rvv,ruv,ru_new,rv_new,e_new,p_new
-    double precision :: druu_dx,druv_dx,druv_dy,drvv_dy
+    !double precision :: druu_dx,druv_dx,druv_dy,drvv_dy
     double precision :: tauxx, tauxy,tauyy, qx,qy
-    double precision :: frinv(nx,ny), frvis(nx,ny),grinv(nx,ny), grvis(nx,ny)
-    double precision :: fuinv(nx,ny), fuvis(nx,ny),guinv(nx,ny), guvis(nx,ny)
-    double precision :: fvinv(nx,ny), fvvis(nx,ny),gvinv(nx,ny), gvvis(nx,ny)
-    double precision :: feinv(nx,ny), fevis(nx,ny),geinv(nx,ny), gevis(nx,ny)
-    double precision :: fu(nx,ny), fv(nx,ny),fe(nx,ny), fr(nx,ny)
-    double precision :: gu(nx,ny), gv(nx,ny),ge(nx,ny), gr(nx,ny)
+    double precision :: frinv(-2:imax,-2:jmax), frvis(-2:imax,-2:jmax),&
+                            grinv(-2:imax,-2:jmax), grvis(-2:imax,-2:jmax)
+    double precision :: fuinv(-2:imax,-2:jmax), fuvis(-2:imax,-2:jmax),&
+                            guinv(-2:imax,-2:jmax), guvis(-2:imax,-2:jmax)
+    double precision :: fvinv(-2:imax,-2:jmax), fvvis(-2:imax,-2:jmax),&
+                            gvinv(-2:imax,-2:jmax), gvvis(-2:imax,-2:jmax)
+    double precision :: feinv(-2:imax,-2:jmax), fevis(-2:imax,-2:jmax),&
+                            geinv(-2:imax,-2:jmax), gevis(-2:imax,-2:jmax)
+    double precision :: fu(-2:imax,-2:jmax), fv(-2:imax,-2:jmax),fe(-2:imax,-2:jmax), &
+                                                    fr(-2:imax,-2:jmax)
+    double precision :: gu(-2:imax,-2:jmax), gv(-2:imax,-2:jmax),ge(-2:imax,-2:jmax), &
+                                                    gr(-2:imax,-2:jmax)
     double precision :: eckpv, amucv
 
-    double precision :: s11,s22,s12,div,sxx,syy,sxy
+    double precision :: div,sxx,syy,sxy
 
     double precision dx,dy,dt
 
@@ -144,9 +170,9 @@ subroutine update(rho, u, v, T, p, E, rho_new, u_new, v_new, T_new,re,pr,gamma,m
             sxx   = (du_dx+du_dx)
             syy   = (dv_dy+dv_dy)
             sxy   = (dv_dx+du_dy)
-            div   = (s11+s22)/2.
+            div   = (sxx+syy)/2.
             if(abs(sxx+syy+sxy+div) > 0.0) then
-                print *,i,j, sxy,div
+                !print *,i,j, sxy,div
                 !continue
             end if
             frinv(i,j) = (rho(i,j)*u(i,j))
@@ -195,8 +221,8 @@ subroutine update(rho, u, v, T, p, E, rho_new, u_new, v_new, T_new,re,pr,gamma,m
             !write(*,'(2I4,4F16.10)'),i,j, feinv(i,j),fevis(i,j),geinv(i,j),gevis(i,j)!madhu
             !write(*,'(2I4,4F16.10)'),i,j, fr(i,j),fu(i,j),fv(i,j),fe(i,j)!madhu
             !write(*,'(2I4,4F16.10)'),i,j, gr(i,j),gu(i,j),gv(i,j),ge(i,j)!madhu
-            call apply_bc(fr,fu,fv,fe,nx,ny)
-            call apply_bc(gr,gu,gv,ge,nx,ny)
+            call apply_bc(fr,fu,fv,fe,nx,ny,imax,jmax)
+            call apply_bc(gr,gu,gv,ge,nx,ny,imax,jmax)
         end do
     end do
     do j = 2, ny-1
@@ -217,14 +243,23 @@ subroutine update(rho, u, v, T, p, E, rho_new, u_new, v_new, T_new,re,pr,gamma,m
     end do
 end subroutine update
 !-------------------------------------
-subroutine write_output(rho, u, v, T, p,nx,ny)
+subroutine write_output(x,y,rho, u, v, T, p,nx,ny,imax,jmax,time)
     implicit none
-    double precision, intent(in) :: rho(nx,ny), u(nx,ny), v(nx,ny), T(nx,ny), p(nx,ny)
-    integer :: i, j, nx, ny
+    double precision, intent(in) :: rho(-2:imax,-2:jmax), u(-2:imax,-2:jmax), &
+                    v(-2:imax,-2:jmax), T(-2:imax,-2:jmax), p(-2:imax,-2:jmax)
+    double precision :: x(-2:nx+3),y(-2:ny+3)
+    double precision :: time
+    integer :: i, j, nx, ny, imax, jmax
     open(10, file="solution.dat")
-    do j = 2, ny-1
-        do i = 2, nx-1
-            write(10,*) i, j, rho(i,j), u(i,j), v(i,j), T(i,j), p(i,j)
+    write(10, '(A)') "x,y,u,v,t"
+    do j=1, ny
+        do i = 1,nx
+           write(10,'(5F12.6)') x(i),y(j),u(i,j),v(i,j),time
+        end do
+       end do
+    do j = 1, ny
+        do i = 1, nx
+            !write(10,*) i, j, rho(i,j), u(i,j), v(i,j), T(i,j), p(i,j)
         end do
     end do
     close(10)
