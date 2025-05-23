@@ -3,10 +3,10 @@ program navier_stokes_fd
     ! Parameters
     integer, parameter :: nx = 40, ny = 60
     integer, parameter :: imax = nx+3, jmax = ny+3
-    integer, parameter :: nt = 2000
-    double precision :: x(-2:nx+3),y(-2:ny+3), dx, dy, xmax=1, ymax=0.1
+    integer, parameter :: nt = 10000
+    double precision :: x(-2:nx+3),y(-2:ny+3), dx, dy, xmax=1, ymax=0.2
     double precision, parameter :: dt = 1e-6
-    double precision, parameter :: gamma = 1.4, mach=0.4, s1=110.4/273., re=100, pr=0.72
+    double precision, parameter :: gamma = 1.4, mach=0.6, s1=110.4/273., re=100, pr=0.72
     double precision, parameter :: R = 287.0
     double precision, parameter :: mu = 1.8e-5
     double precision, parameter :: kappa = 0.025
@@ -34,9 +34,10 @@ program navier_stokes_fd
     ! Time-stepping
     time=0
       do n = 1, nt
-        call RK3_update(rho, u, v, T, p, E,rho_new,u_new,v_new,T_new,re,pr,gamma,mach, &
+        call RK2_update(rho, u, v, T, p, E,rho_new,u_new,v_new,T_new,re,pr,gamma,mach, &
                                                     s1,dt,dx,dy,nx,ny,imax,jmax)
         call apply_bc(rho_new, u_new, v_new, T_new,nx,ny,imax,jmax)
+        !call apply_bc(rho, u, v, T,nx,ny,imax,jmax)
         call compute_pressure_energy(rho_new,u_new,v_new,T_new,p,E,re,pr,gamma,mach, &
                                                                 s1,nx,ny,imax,jmax)
 
@@ -58,6 +59,7 @@ subroutine initialize(x,y,dx,dy,xmax,ymax,rho, u, v, T,nx,ny,imax,jmax)
                                                  T(-2:imax,-2:jmax)
     double precision :: x(-2:nx+3),y(-2:ny+3), dx, dy, xmax, ymax
     double precision :: rad, theta, pi
+
 
     integer :: i, j, nx, ny, imax, jmax
 
@@ -92,6 +94,7 @@ subroutine apply_bc(rho, u, v, T,nx,ny,imax,jmax)
     double precision :: dx,dy
     integer :: i, j, nx, ny, imax, jmax
     integer :: bp=0,b0=1,bs=0,bn=0,ba=0;
+    double precision :: temp
 
     do j = 1, ny
         rho(1,j) = rho(2,j)*b0+rho(nx,j)*bp
@@ -102,10 +105,10 @@ subroutine apply_bc(rho, u, v, T,nx,ny,imax,jmax)
         u(0,j)   =   u(2,j)*b0+  u(nx-1,j)*bp
         v(0,j)   =   v(2,j)*b0+  v(nx-1,j)*bp
         T(0,j)   =   T(2,j)*b0+  T(nx-1,j)*bp
-        u(-2:0,j)=1.0
-        v(-2:0,j)=0.
-        T(-2:0,j)=1.0
-        rho(-2:0,j)=1.0
+        u(-2:1,j)=1.0
+        v(-2:1,j)=0.
+        T(-2:1,j)=1.0
+        rho(-2:1,j)=1.0
 
         rho(nx,j) = rho(nx-1,j)*b0+rho(1,j)*bp
         u(nx,j)   =   u(nx-1,j)*b0+  u(1,j)*bp
@@ -143,10 +146,10 @@ subroutine apply_bc(rho, u, v, T,nx,ny,imax,jmax)
             !call apply_bc(gr,gu,gv,ge,nx,ny,imax,jmax)
         !end do  
       !end do 
-        rho(i,ny) = rho(i,ny-1)*b0+rho(i,1)*bp
-        u(i,ny) =     u(i,ny-1)*b0+  u(i,1)*bp
-        v(i,ny) =     v(i,ny-1)*b0+  v(i,1)*bp
-        T(i,ny) =     T(i,ny-1)*b0+  T(i,1)*bp
+        !rho(i,ny) = rho(i,ny-1)*b0+rho(i,1)*bp
+        !u(i,ny) =     u(i,ny-1)*b0+  u(i,1)*bp
+        !v(i,ny) =     v(i,ny-1)*b0+  v(i,1)*bp
+        !T(i,ny) =     T(i,ny-1)*b0+  T(i,1)*bp
         rho(i,ny+1) = rho(i,ny-1)*b0+rho(i,2)*bp
         u(i,ny+1) =     u(i,ny-1)*b0+  u(i,2)*bp
         v(i,ny+1) =     v(i,ny-1)*b0+  v(i,2)*bp
@@ -172,8 +175,20 @@ subroutine apply_bc(rho, u, v, T,nx,ny,imax,jmax)
     !T(nx+1,:)=T(nx,:)
     !T(:,0)=T(:,1)
     !T(:,ny+1)=T(:,ny)
-    !u(:,-2:1)=0;
-    !v(:,-2:1)=0;
+    u(:,-2:1)=0
+    v(:,-2:1)=0
+    T(:,-2:1)=1
+    do i=-2,imax
+        temp=rho(i,2)
+        rho(i,-2)=temp
+        rho(i,-1)=temp
+        rho(i,0)=temp
+        rho(i,1)=temp
+    end do
+    !u(-2:1,:)=u(nx-3:nx,:)
+    !v(-2:1,:)=v(nx-3:nx,:)
+    !T(-2:1,:)=T(nx-3:nx,:)
+    !rho(-2:1,:)=rho(nx-3:nx,:)
     
     dx=1./(nx-1)
     dy=.1/(ny-1)
@@ -188,7 +203,7 @@ subroutine apply_bc(rho, u, v, T,nx,ny,imax,jmax)
         !u(1:nx,j)=uf 
         !v(1:nx,j)=vf 
     end do
-    rho(1:nx,1:ny)=1.0
+    !rho(-2:imax,-2:jmax)=1.0
     !u=1.0
     !explicitFilter4x(f, fx, dx, imax, boundary_flag_L, boundary_flag_R)
     
@@ -210,86 +225,6 @@ subroutine compute_pressure_energy(rho, u, v, T, p, E,re,pr,gamma,mach,s1,nx,ny,
         end do
     end do
 end subroutine compute_pressure_energy
-!---------------------------
-subroutine update(rho, u, v, T, p, E, rho_new, u_new, v_new, T_new,re,pr,gamma,mach,&
-                                            s1,dt,dx,dy,nx,ny,imax,jmax)
-                                            
-
-    implicit none
-    integer :: i, j, nx, ny, imax, jmax
-    double precision  rho(-2:imax,-2:jmax), u(-2:imax,-2:jmax), &
-                                                v(-2:imax,-2:jmax), T(-2:imax,-2:jmax)
-    double precision   p(-2:imax,-2:jmax), E(-2:imax,-2:jmax)
-    double precision   rho_new(-2:imax,-2:jmax), u_new(-2:imax,-2:jmax), &
-                    v_new(-2:imax,-2:jmax), T_new(-2:imax,-2:jmax) 
-    double precision :: gamma, mach, s1, re, pr
-    double precision :: ru_new,rv_new,e_new,p_new
-
-    double precision :: frinv(-2:imax,-2:jmax), frvis(-2:imax,-2:jmax),&
-                            grinv(-2:imax,-2:jmax), grvis(-2:imax,-2:jmax)
-    double precision :: fuinv(-2:imax,-2:jmax), fuvis(-2:imax,-2:jmax),&
-                            guinv(-2:imax,-2:jmax), guvis(-2:imax,-2:jmax)
-    double precision :: fvinv(-2:imax,-2:jmax), fvvis(-2:imax,-2:jmax),&
-                            gvinv(-2:imax,-2:jmax), gvvis(-2:imax,-2:jmax)
-    double precision :: feinv(-2:imax,-2:jmax), fevis(-2:imax,-2:jmax),&
-                            geinv(-2:imax,-2:jmax), gevis(-2:imax,-2:jmax)
-    double precision :: fu(-2:imax,-2:jmax), fv(-2:imax,-2:jmax),fe(-2:imax,-2:jmax), &
-                                                    fr(-2:imax,-2:jmax)
-    double precision :: gu(-2:imax,-2:jmax), gv(-2:imax,-2:jmax),ge(-2:imax,-2:jmax), &
-                                                    gr(-2:imax,-2:jmax)
-
-    double precision dx,dy,dt
-    open(12,file="outfiletemp.txt")
-
-    call inviscid_flux(rho, u, v, T, p, E,frinv,fuinv,fvinv,feinv,&
-            frinv,fuinv,fvinv,feinv,nx,ny,imax,jmax)
-
-
-    ! Viscous stress contributions
-    call viscous_flux(rho, u, v, T, p, E, fuvis,fvvis,fevis,guvis,gvvis,gevis, &
-            re,pr,gamma,mach,s1,dt,dx,dy,nx,ny,imax,jmax)
-
-    do j = 1, ny-0
-        do i = 1, nx-0
-            fr(i,j)=-frinv(i,j)
-            fu(i,j)=-fuinv(i,j)+fuvis(i,j)
-            fv(i,j)=-fvinv(i,j)+fvvis(i,j)
-            fe(i,j)=-feinv(i,j)+fevis(i,j)
-
-            gr(i,j)=-grinv(i,j)
-            gu(i,j)=-guinv(i,j)+guvis(i,j)
-            gv(i,j)=-gvinv(i,j)+gvvis(i,j)
-            ge(i,j)=-geinv(i,j)+gevis(i,j)
-        end do  
-    end do 
-    do i = 1, nx-0,5
-        do j = 1, ny-0
-            !write(12,'(2I4,4E14.7)'),i,j, fr(i,j),fu(i,j),fv(i,j),fe(i,j)!madhu
-            !write(12,'(2I4,4E14.7)'),i,j, gr(i,j),gu(i,j),gv(i,j),ge(i,j)!madhu
-            !call apply_bc(fr,fu,fv,fe,nx,ny,imax,jmax)
-            !call apply_bc(gr,gu,gv,ge,nx,ny,imax,jmax)
-        end do  
-    end do 
-    do j = 2, ny-1
-        do i = 2, nx-1
-            ! Update equations
-            rho_new(i,j) = rho(i,j)+dt*((fr(i+1,j)-fr(i-1,j))/2./dx+(gr(i,j+1)-gr(i,j-1))/2./dy)
-            ru_new=rho(i,j)*u(i,j) +dt*((fu(i+1,j)-fu(i-1,j))/2./dx+(gu(i,j+1)-gu(i,j-1))/2./dy)
-            rv_new=rho(i,j)*v(i,j) +dt*((fv(i+1,j)-fv(i-1,j))/2./dx+(gv(i,j+1)-gv(i,j-1))/2./dy)
-            e_new        =   E(i,j)+dt*((fe(i+1,j)-fe(i-1,j))/2./dx+(ge(i,j+1)-ge(i,j-1))/2./dy)
-
-            u_new(i,j) = ru_new/rho_new(i,j)
-            v_new(i,j) = rv_new/rho_new(i,j)
-            p_new=(e_new-0.5*rho_new(i,j)*(u_new(i,j)**2+v_new(i,j)**2))*(gamma-1)
-            T_new(i,j)=p_new/rho_new(i,j)*gamma*mach**2
-
-            !write(12,'(2I4,6F16.10)'),i,j,u(i,j),v(i,j),u_new(i,j),v_new(i,j),ru,ru_new
-            !write(12,'(2I4,6F16.10)'),i,j,rho(i,j),u(i,j),v(i,j),E(i,j),T(i,j),p(i,j)
-            !write(12,'(2I4,6F16.10)'),i,j,rho_new(i,j),u_new(i,j),v_new(i,j),e_new,T_new(i,j),p_new
-        end do
-    end do
-
-end subroutine update
 !-------------------------------------
 subroutine write_output(x,y,rho, u, v, T, p,nx,ny,imax,jmax,time)
     implicit none
@@ -300,12 +235,12 @@ subroutine write_output(x,y,rho, u, v, T, p,nx,ny,imax,jmax,time)
     integer :: i, j, nx, ny, imax, jmax
     open(10, file="outfileuv.txt")
     open(11,file="outfile.txt")
-    write(10, '(A)') "x,y,u,v,t"
+    write(10, '(A)') "x,y,u,v,rho,T"
     open(11, file="outfile.txt")
-    write(11, '(A)') "x,y,r,u,v,p"
+    write(11, '(A)') "x,y,rho,u,v,T"
     do j=1, ny
         do i = 1,nx
-           write(10,'(5E15.7)') x(i),y(j),u(i,j),v(i,j),time
+           write(10,'(6F15.8)') x(i),y(j),u(i,j),v(i,j),rho(i,j),T(i,j)
         end do
        end do
     do i = 1, nx
@@ -338,7 +273,7 @@ do j = 1, ny
         fuinv(i,j) = (rho(i,j)*u(i,j)**2 + p(i,j))
         guinv(i,j) = (rho(i,j)*u(i,j)*v(i,j) + p(i,j))
 
-        fvinv(i,j) = (rho(i,j)*u(i,j+1)*v(i,j)+ p(i,j))
+        fvinv(i,j) = (rho(i,j)*u(i,j)*v(i,j)+ p(i,j))
         gvinv(i,j) = (rho(i,j)*v(i,j)**2 + p(i,j))
 
         feinv(i,j)=u(i,j)*(E(i,j)+p(i,j))
@@ -390,23 +325,23 @@ do j = 1, ny
     !dTdy(i,j) = (T(i,j-2)-6*T(i,j-1)+3*T(i,j)+2*T(i,j+1))/(6.*dy)
   end do
   i=1
-  !dudx(i,j) = (u(i+1,j) - u(i,j)) / (1.0*dx)
-  !dvdx(i,j) = (v(i+1,j) - v(i,j)) / (1.0*dx)
-  !dTdx(i,j) = (T(i+1,j) - T(i,j)) / (1.0*dx)
+  dudx(i,j) = (u(i+1,j) - u(i,j)) / (1.0*dx)
+  dvdx(i,j) = (v(i+1,j) - v(i,j)) / (1.0*dx)
+  dTdx(i,j) = (T(i+1,j) - T(i,j)) / (1.0*dx)
   i=nx
-  !dudx(i,j) = (u(i,j) - u(i-1,j)) / (1.0*dx)
-  !dvdx(i,j) = (v(i,j) - v(i-1,j)) / (1.0*dx)
-  !dTdx(i,j) = (T(i,j) - T(i-1,j)) / (1.0*dx)
+  dudx(i,j) = (u(i,j) - u(i-1,j)) / (1.0*dx)
+  dvdx(i,j) = (v(i,j) - v(i-1,j)) / (1.0*dx)
+  dTdx(i,j) = (T(i,j) - T(i-1,j)) / (1.0*dx)
 end do 
 do i = 1, nx
     j=1
-    !dudy(i,j) = (u(i,j+1) - u(i,j)) / (1.0*dy)
-    !dvdy(i,j) = (v(i,j+1) - v(i,j)) / (1.0*dy)
-    !dTdy(i,j) = (T(i,j+1) - T(i,j)) / (1.0*dy)
+    dudy(i,j) = (u(i,j+1) - u(i,j)) / (1.0*dy)
+    dvdy(i,j) = (v(i,j+1) - v(i,j)) / (1.0*dy)
+    dTdy(i,j) = (T(i,j+1) - T(i,j)) / (1.0*dy)
     j=ny
-    !dudy(i,j) = (u(i,j) - u(i,j-1)) / (1.0*dy)
-    !dvdy(i,j) = (v(i,j) - v(i,j-1)) / (1.0*dy)
-    !dTdy(i,j) = (T(i,j) - T(i,j-1)) / (1.0*dy)
+    dudy(i,j) = (u(i,j) - u(i,j-1)) / (1.0*dy)
+    dvdy(i,j) = (v(i,j) - v(i,j-1)) / (1.0*dy)
+    dTdy(i,j) = (T(i,j) - T(i,j-1)) / (1.0*dy)
 end do 
 do j = 1, ny
   do i = 1, nx
@@ -485,7 +420,6 @@ double precision A54(5),B54(5),C54(5)
     C54(2)=1./5.
     C54(3)=3./10.
     C54(4)=3./5.
-    C54(5)=1.0
     C54(1)=0.0
     !----------------------------------------------------
 
@@ -547,20 +481,22 @@ v_new = v
 E_new= E
 end subroutine RK_update
 !--------------------------------------------------------------
-subroutine RK2_update(rho, u, v, T, p, E, rho_new, u_new, v_new, T_new,re,pr,gamma,mach,&
+subroutine RK2_update(rho, u, v, T, p, E, rho_new, u_new, v_new,T_new,re,pr,gamma,mach,&
     s1,dt,dx,dy,nx,ny,imax,jmax)
 implicit none
-integer :: i, j, ir, nx, ny, imax, jmax, nmax54
+integer :: i, j, nx, ny, imax, jmax
 double precision  rho(-2:imax,-2:jmax), u(-2:imax,-2:jmax), &
         v(-2:imax,-2:jmax), T(-2:imax,-2:jmax)
+double precision  rho0(-2:imax,-2:jmax), u0(-2:imax,-2:jmax), &
+        v0(-2:imax,-2:jmax), E0(-2:imax,-2:jmax)
 double precision   p(-2:imax,-2:jmax), E(-2:imax,-2:jmax)
 double precision  rho_new(-2:imax,-2:jmax), u_new(-2:imax,-2:jmax), &
 v_new(-2:imax,-2:jmax), T_new(-2:imax,-2:jmax)
 double precision :: gamma, mach, s1, re, pr
-double precision :: ru_new,rv_new,E_new(-2:imax,-2:jmax),p_new,rr_new,rE_new
+double precision :: E_new(-2:imax,-2:jmax)
 
-double precision :: frinv(-2:imax,-2:jmax), frvis(-2:imax,-2:jmax),&
-grinv(-2:imax,-2:jmax), grvis(-2:imax,-2:jmax)
+double precision :: frinv(-2:imax,-2:jmax), &
+grinv(-2:imax,-2:jmax)
 double precision :: fuinv(-2:imax,-2:jmax), fuvis(-2:imax,-2:jmax),&
 guinv(-2:imax,-2:jmax), guvis(-2:imax,-2:jmax)
 double precision :: fvinv(-2:imax,-2:jmax), fvvis(-2:imax,-2:jmax),&
@@ -576,31 +512,16 @@ double precision :: kr(-2:imax,-2:jmax), ku(-2:imax,-2:jmax),kv(-2:imax,-2:jmax)
 double precision :: mr(-2:imax,-2:jmax), mu(-2:imax,-2:jmax),mv(-2:imax,-2:jmax), &
             me(-2:imax,-2:jmax)            
 double precision dx,dy,dt
-double precision A54(5),B54(5),C54(5)
-    !----------------------------------------------------
-    nmax54=5
-    A54(1) = 0.0d0
-    A54(2) = -567301805773.0d0 / 1357537059087.0d0
-    A54(3) = 0.0d0 - 2404267990393.0d0 / 2016746695238.0d0
-    A54(4) = 0.0d0 - 3550918686646.0d0 / 2091501179385.0d0
-    A54(5) = 0.0d0 - 1275806237668.0d0 / 842570457699.0d0
-    B54(1) = 1432997174477.0d0 / 9575080441755.0d0
-    B54(2) = 5161836677717.0d0 / 13612068292357.0d0
-    B54(3) = 1720146321549.0d0 / 2090206949498.0d0
-    B54(4) = 3134564353537.0d0 / 4481467310338.0d0
-    B54(5) = 2277821191437.0d0 / 14882151754819.0d0
-    C54(2)=1./5.
-    C54(3)=3./10.
-    C54(4)=3./5.
-    C54(5)=1.0
-    C54(1)=0.0
-    !----------------------------------------------------
 
 open(12,file="outfiletemp.txt")
 rho_new = rho
 u_new = u
 v_new = v
 E_new= E
+rho0 = rho
+u0= u
+v0 = v
+E0= E
 
   call inviscid_flux(rho, u, v, T, p, E,frinv,fuinv,fvinv,feinv,&
                           frinv,fuinv,fvinv,feinv,nx,ny,imax,jmax)
@@ -623,10 +544,10 @@ end do
  do j = 2, ny-1
     do i = 2, nx-1
 ! Update equations
-        kr(i,j)=((fr(i+1,j)-fr(i-1,j))/2./dx+(gr(i,j+1)-gr(i,j-1))/2./dy)
-        ku(i,j)=((fu(i+1,j)-fu(i-1,j))/2./dx+(gu(i,j+1)-gu(i,j-1))/2./dy)
-        kv(i,j)=((fv(i+1,j)-fv(i-1,j))/2./dx+(gv(i,j+1)-gv(i,j-1))/2./dy)
-        ke(i,j)=((fe(i+1,j)-fe(i-1,j))/2./dx+(ge(i,j+1)-ge(i,j-1))/2./dy)
+        kr(i,j)=((fr(i+1,j)-fr(i-0,j))/1./dx+(gr(i,j+1)-gr(i,j-0))/1./dy)
+        ku(i,j)=((fu(i+1,j)-fu(i-0,j))/1./dx+(gu(i,j+1)-gu(i,j-0))/1./dy)
+        kv(i,j)=((fv(i+1,j)-fv(i-0,j))/1./dx+(gv(i,j+1)-gv(i,j-0))/1./dy)
+        ke(i,j)=((fe(i+1,j)-fe(i-0,j))/1./dx+(ge(i,j+1)-ge(i,j-0))/1./dy)
         rho_new(i,j)=rho(i,j)+dt*kr(i,j)
         u_new(i,j)=rho(i,j)*u(i,j)+dt*ku(i,j)
         v_new(i,j)=rho(i,j)*v(i,j)+dt*kv(i,j)
@@ -647,29 +568,29 @@ frinv,fuinv,fvinv,feinv,nx,ny,imax,jmax)
 call viscous_flux(rho, u, v, T, p, E, fuvis,fvvis,fevis,guvis,gvvis,gevis, &
 re,pr,gamma,mach,s1,dt,dx,dy,nx,ny,imax,jmax)
 do j = 1, ny-0
-do i = 1, nx-0
-fr(i,j)=-frinv(i,j)
-fu(i,j)=-fuinv(i,j)+fuvis(i,j)
-fv(i,j)=-fvinv(i,j)+fvvis(i,j)
-fe(i,j)=-feinv(i,j)+fevis(i,j)
+ do i = 1, nx-0
+  fr(i,j)=-frinv(i,j)
+  fu(i,j)=-fuinv(i,j)+fuvis(i,j)
+  fv(i,j)=-fvinv(i,j)+fvvis(i,j)
+  fe(i,j)=-feinv(i,j)+fevis(i,j)
 
-gr(i,j)=-grinv(i,j)
-gu(i,j)=-guinv(i,j)+guvis(i,j)
-gv(i,j)=-gvinv(i,j)+gvvis(i,j)
-ge(i,j)=-geinv(i,j)+gevis(i,j)
-end do  
+  gr(i,j)=-grinv(i,j)
+  gu(i,j)=-guinv(i,j)+guvis(i,j)
+  gv(i,j)=-gvinv(i,j)+gvvis(i,j)
+  ge(i,j)=-geinv(i,j)+gevis(i,j)
+ end do  
 end do 
 do j = 2, ny-1
     do i = 2, nx-1
 ! Update equations
-        mr(i,j)=((fr(i+1,j)-fr(i-1,j))/2./dx+(gr(i,j+1)-gr(i,j-1))/2./dy)
-        mu(i,j)=((fu(i+1,j)-fu(i-1,j))/2./dx+(gu(i,j+1)-gu(i,j-1))/2./dy)
-        mv(i,j)=((fv(i+1,j)-fv(i-1,j))/2./dx+(gv(i,j+1)-gv(i,j-1))/2./dy)
-        me(i,j)=((fe(i+1,j)-fe(i-1,j))/2./dx+(ge(i,j+1)-ge(i,j-1))/2./dy)
-        rho_new(i,j)=rho(i,j)     +dt/2.*(kr(i,j)+mr(i,j))
-        u_new(i,j)=rho(i,j)*u(i,j)+dt/2.*(ku(i,j)+mu(i,j))
-        v_new(i,j)=rho(i,j)*v(i,j)+dt/2.*(kv(i,j)+mv(i,j))
-        E_new(i,j)=E(i,j)         +dt/2.*(ke(i,j)+me(i,j))
+        mr(i,j)=((fr(i+0,j)-fr(i-1,j))/1./dx+(gr(i,j+0)-gr(i,j-1))/1./dy)
+        mu(i,j)=((fu(i+0,j)-fu(i-1,j))/1./dx+(gu(i,j+0)-gu(i,j-1))/1./dy)
+        mv(i,j)=((fv(i+0,j)-fv(i-1,j))/1./dx+(gv(i,j+0)-gv(i,j-1))/1./dy)
+        me(i,j)=((fe(i+0,j)-fe(i-1,j))/1./dx+(ge(i,j+0)-ge(i,j-1))/1./dy)
+        rho_new(i,j)=rho0(i,j)      +dt/2.*(kr(i,j)+mr(i,j))
+        u_new(i,j)=rho0(i,j)*u0(i,j)+dt/2.*(ku(i,j)+mu(i,j))
+        v_new(i,j)=rho0(i,j)*v0(i,j)+dt/2.*(kv(i,j)+mv(i,j))
+        E_new(i,j)=E0(i,j)          +dt/2.*(ke(i,j)+me(i,j))
         rho(i,j)=rho_new(i,j)
         u(i,j)=u_new(i,j)/rho_new(i,j)
         v(i,j)=v_new(i,j)/rho_new(i,j)
@@ -687,6 +608,7 @@ rho_new = rho
 u_new = u
 v_new = v
 E_new= E
+!T_new=T
 end subroutine RK2_update
 !------------------------------------------
     ! Stage 1
